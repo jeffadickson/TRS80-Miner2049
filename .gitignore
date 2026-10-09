@@ -1,0 +1,9 @@
+build/*
+!build/miner3.cmd
+!build/MINER3H.CAS
+!build/MINER3L.CAS
+rom/*
+!rom/README.md
+__pycache__/
+emulator/native/m3test
+*.pkl

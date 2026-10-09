@@ -1,0 +1,170 @@
+<title>Miner 2049er for the Model III</title>
+<script type="importmap">{"imports":{"z80-base":"https://cdn.jsdelivr.net/npm/z80-base@2.0.1/dist/index.js"}}</script>
+<style>
+/* Layout: the screen is the page. A beige Model III bezel around a 4:3 canvas, controls and notes below. */
+:root { --bg:#e9e6df; --ink:#22211f; --muted:#6c675e; --bezel:#d8d1c2; --bezel-edge:#bfb6a3; --screen:#05070a; --phosphor:#dfe9ff; --accent:#a8461a; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#141412; --ink:#ebe7df; --muted:#a39d91; --bezel:#2c2a26; --bezel-edge:#45413a; --accent:#e48a5a; color-scheme: dark; } }
+:root[data-theme="dark"] { --bg:#141412; --ink:#ebe7df; --muted:#a39d91; --bezel:#2c2a26; --bezel-edge:#45413a; --accent:#e48a5a; color-scheme: dark; }
+body { background: var(--bg); color: var(--ink); font-family: "IBM Plex Sans", system-ui, sans-serif; margin: 0; }
+.wrap { max-width: 900px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 40px; }
+h1 { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 22px; letter-spacing: .04em; margin: 0 0 4px; }
+.sub { color: var(--muted); margin: 0 0 16px; font-size: 14px; }
+.bezel { background: var(--bezel); border: 1px solid var(--bezel-edge); border-radius: 14px; padding: 22px; box-shadow: inset 0 2px 0 rgba(255,255,255,.25); }
+.screen { background: var(--screen); border-radius: 10px; padding: 18px; position: relative; }
+canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; }
+.overlay[hidden] { display: none; }
+.overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.overlay button { font-family: "IBM Plex Mono", monospace; font-size: 16px; padding: 12px 20px; border-radius: 6px; border: 1px solid #555; background: #1b1e24; color: #dfe9ff; cursor: pointer; }
+.ctl { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; align-items: center; font-family: "IBM Plex Mono", monospace; font-size: 13px; }
+.ctl button { font-family: inherit; font-size: 13px; padding: 7px 12px; border-radius: 4px; border: 1px solid var(--bezel-edge); background: var(--bg); color: var(--ink); cursor: pointer; }
+.ctl button:focus-visible { outline: 2px solid var(--accent); }
+.pad { display: none; gap: 10px; margin-top: 14px; justify-content: space-between; user-select: none; -webkit-user-select: none; }
+.pad .dirs { display: grid; grid-template-columns: repeat(3, 56px); grid-template-rows: repeat(2, 56px); gap: 6px; }
+.pad button { font-size: 18px; border-radius: 8px; border: 1px solid var(--bezel-edge); background: var(--bezel); color: var(--ink); touch-action: none; }
+@media (pointer: coarse) { .pad { display: flex; } }
+.keys { color: var(--muted); font-size: 13.5px; line-height: 1.6; margin-top: 16px; }
+kbd { font-family: "IBM Plex Mono", monospace; font-size: 12px; border: 1px solid var(--bezel-edge); border-bottom-width: 2px; border-radius: 3px; padding: 0 5px; background: var(--bg); }
+.status { color: var(--muted); }
+</style>
+<div class="wrap">
+  <h1>MINER 2049er &middot; TRS-80 MODEL III</h1>
+  <p class="sub">A port of Bill Hogue's 1982 Atari game to the Model III's 128 &times; 48 block graphics, running here in a Z80 emulator. Build 0.11: tested by an automated player on all ten stations; ENTER drives the lift.</p>
+  <div class="bezel">
+    <div class="screen">
+      <canvas id="cv" width="512" height="384" aria-label="Model III screen"></canvas>
+      <div class="overlay" id="ov"><button id="go" type="button">Power on</button></div>
+    </div>
+  </div>
+  <div class="ctl">
+    <button id="reset" type="button">Reset</button>
+    <button id="snd" type="button">Sound: on</button>
+    <span class="status" id="st"></span>
+  </div>
+  <div class="pad" id="pad">
+    <div class="dirs">
+      <span></span><button data-k="UP" type="button" aria-label="Up">&#9650;</button><span></span>
+      <button data-k="LEFT" type="button" aria-label="Left">&#9664;</button><button data-k="DOWN" type="button" aria-label="Down">&#9660;</button><button data-k="RIGHT" type="button" aria-label="Right">&#9654;</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <button data-k="SPACE" type="button" style="width:120px;height:56px">JUMP</button>
+      <div style="display:flex;gap:6px"><button data-k="1" type="button" style="width:36px;height:40px">1</button><button data-k="2" type="button" style="width:36px;height:40px">2</button><button data-k="3" type="button" style="width:36px;height:40px">3</button><button data-k="4" type="button" style="width:36px;height:40px">4</button></div>
+    </div>
+  </div>
+  <p class="keys"><kbd>&larr;</kbd> <kbd>&rarr;</kbd> walk &nbsp; <kbd>&uarr;</kbd> <kbd>&darr;</kbd> climb &nbsp; <kbd>Space</kbd> jump &nbsp; <kbd>Esc</kbd> pause (BREAK). On the title screen a digit picks the starting station (<kbd>0</kbd> = 10); leave it alone and the demonstration runs. Walk over every girder section to claim it before the bonus runs out; picking up an item makes the mutants edible for a few seconds.</p>
+  <p class="keys">Station 3 and 7: stand in a booth and press <kbd>1</kbd>&ndash;<kbd>4</kbd> to beam to that booth. Station 8: on the lift, <kbd>Enter</kbd> takes the controls and the arrows drive it; <kbd>Enter</kbd> or <kbd>Space</kbd> lets go. <kbd>Space</kbd> still jumps when you are not driving. Station 10: each TNT bundle adds its tons to the charge; walk into the cannon, roll it with the arrows, <kbd>Space</kbd> fires. One ton reaches the lowest platform, three the top; four is too many.</p>
+  <p class="keys">Testing keys: <kbd>I</kbd> on the title screen turns invincibility on or off (a <code>*</code> at the end of the status line; the screen flashes where he would have died). With it on, during play: hold <kbd>U</kbd> to see only the land still to claim, with a count; <kbd>N</kbd> goes to the next station.</p>
+</div>
+<script>window.CMD="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";window.FONT={"32": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "33": [0, 0, 32, 32, 32, 32, 32, 32, 0, 32, 0, 0], "34": [0, 0, 48, 48, 48, 0, 0, 0, 0, 0, 0, 0], "35": [0, 0, 20, 20, 16, 60, 24, 60, 40, 32, 0, 0], "36": [0, 8, 28, 62, 42, 56, 28, 10, 42, 28, 8, 0], "37": [0, 0, 114, 84, 84, 40, 10, 21, 21, 39, 0, 0], "38": [0, 0, 28, 32, 34, 31, 50, 34, 34, 30, 0, 0], "39": [0, 0, 64, 64, 64, 0, 0, 0, 0, 0, 0, 0], "40": [0, 0, 16, 32, 32, 32, 32, 32, 32, 16, 16, 0], "41": [0, 0, 64, 32, 32, 32, 32, 32, 32, 64, 64, 0], "42": [0, 0, 0, 0, 0, 8, 8, 28, 20, 0, 0, 0], "43": [0, 0, 0, 0, 8, 8, 62, 8, 8, 0, 0, 0], "44": [0, 0, 0, 0, 0, 0, 0, 0, 0, 64, 128, 0], "45": [0, 0, 0, 0, 0, 0, 96, 0, 0, 0, 0, 0], "46": [0, 0, 0, 0, 0, 0, 0, 0, 0, 64, 0, 0], "47": [0, 0, 16, 16, 0, 32, 32, 32, 64, 64, 0, 0], "48": [0, 0, 56, 108, 68, 68, 68, 68, 108, 56, 0, 0], "49": [0, 0, 24, 56, 8, 8, 8, 8, 8, 8, 0, 0], "50": [0, 0, 24, 36, 4, 4, 8, 16, 32, 60, 0, 0], "51": [0, 0, 56, 100, 4, 24, 4, 68, 68, 56, 0, 0], "52": [0, 0, 4, 12, 20, 20, 36, 62, 4, 4, 0, 0], "53": [0, 0, 60, 32, 64, 120, 100, 4, 68, 56, 0, 0], "54": [0, 0, 56, 100, 68, 120, 68, 68, 68, 56, 0, 0], "55": [0, 0, 124, 4, 8, 8, 16, 16, 32, 32, 0, 0], "56": [0, 0, 56, 68, 68, 56, 68, 68, 68, 56, 0, 0], "57": [0, 0, 56, 68, 68, 68, 60, 68, 76, 56, 0, 0], "58": [0, 0, 0, 0, 64, 0, 0, 0, 0, 64, 0, 0], "59": [0, 0, 0, 0, 64, 0, 0, 0, 64, 64, 128, 0], "60": [0, 0, 0, 0, 0, 12, 48, 48, 8, 4, 0, 0], "61": [0, 0, 0, 0, 0, 60, 0, 60, 0, 0, 0, 0], "62": [0, 0, 0, 0, 0, 48, 12, 12, 16, 32, 0, 0], "63": [0, 0, 48, 72, 8, 8, 16, 16, 0, 16, 0, 0], "64": [0, 0, 7, 24, 23, 41, 41, 43, 39, 16, 15, 0], "65": [0, 0, 8, 24, 20, 20, 60, 34, 34, 66, 0, 0], "66": [0, 0, 60, 34, 34, 32, 62, 34, 34, 60, 0, 0], "67": [0, 0, 60, 34, 66, 64, 64, 66, 34, 60, 0, 0], "68": [0, 0, 60, 34, 33, 33, 33, 33, 34, 60, 0, 0], "69": [0, 0, 62, 32, 32, 32, 60, 32, 32, 62, 0, 0], "70": [0, 0, 62, 32, 32, 32, 60, 32, 32, 32, 0, 0], "71": [0, 0, 60, 38, 66, 64, 78, 66, 38, 58, 0, 0], "72": [0, 0, 33, 33, 33, 33, 63, 33, 33, 33, 0, 0], "73": [0, 0, 32, 32, 32, 32, 32, 32, 32, 32, 0, 0], "74": [0, 0, 4, 4, 4, 4, 4, 36, 36, 24, 0, 0], "75": [0, 0, 34, 36, 40, 56, 56, 44, 36, 34, 0, 0], "76": [0, 0, 32, 32, 32, 32, 32, 32, 32, 62, 0, 0], "77": [0, 0, 49, 49, 49, 42, 42, 42, 46, 36, 0, 0], "78": [0, 0, 49, 49, 41, 41, 37, 37, 35, 35, 0, 0], "79": [0, 0, 28, 34, 65, 65, 65, 65, 34, 28, 0, 0], "80": [0, 0, 60, 34, 34, 34, 60, 32, 32, 32, 0, 0], "81": [0, 0, 28, 34, 65, 65, 65, 65, 34, 31, 0, 0], "82": [0, 0, 60, 34, 34, 34, 60, 38, 34, 34, 0, 0], "83": [0, 0, 28, 34, 32, 24, 6, 2, 34, 28, 0, 0], "84": [0, 0, 62, 8, 8, 8, 8, 8, 8, 8, 0, 0], "85": [0, 0, 34, 34, 34, 34, 34, 34, 34, 28, 0, 0], "86": [0, 0, 66, 34, 34, 36, 20, 20, 24, 24, 0, 0], "87": [0, 0, 70, 102, 38, 42, 41, 41, 25, 17, 0, 0], "88": [0, 0, 34, 36, 20, 24, 24, 20, 36, 98, 0, 0], "89": [0, 0, 34, 34, 20, 28, 8, 8, 8, 8, 0, 0], "90": [0, 0, 62, 6, 4, 8, 8, 16, 48, 62, 0, 0], "91": [0, 48, 32, 32, 32, 32, 32, 32, 32, 32, 48, 0], "92": [0, 0, 64, 64, 0, 32, 32, 32, 16, 16, 0, 0], "93": [0, 96, 32, 32, 32, 32, 32, 32, 32, 32, 96, 0], "94": [0, 0, 0, 0, 24, 24, 36, 36, 0, 0, 0, 0], "95": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 56, 0], "96": [0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0], "97": [0, 0, 0, 0, 56, 72, 56, 104, 72, 120, 0, 0], "98": [0, 0, 32, 32, 60, 34, 34, 34, 34, 60, 0, 0], "99": [0, 0, 0, 0, 56, 68, 64, 64, 68, 56, 0, 0], "100": [0, 0, 4, 4, 60, 68, 68, 68, 68, 60, 0, 0], "101": [0, 0, 0, 0, 56, 68, 124, 64, 68, 56, 0, 0], "102": [0, 16, 48, 32, 112, 32, 32, 32, 32, 32, 0, 0], "103": [0, 0, 0, 0, 60, 68, 68, 68, 68, 60, 68, 56], "104": [0, 0, 32, 32, 60, 50, 34, 34, 34, 34, 0, 0], "105": [0, 0, 32, 0, 32, 32, 32, 32, 32, 32, 0, 0], "106": [0, 0, 0, 0, 32, 32, 32, 32, 32, 32, 32, 96], "107": [0, 0, 32, 32, 36, 40, 48, 56, 44, 36, 0, 0], "108": [0, 0, 32, 32, 32, 32, 32, 32, 32, 48, 0, 0], "109": [0, 0, 0, 0, 63, 36, 36, 36, 36, 36, 0, 0], "110": [0, 0, 0, 0, 60, 50, 34, 34, 34, 34, 0, 0], "111": [0, 0, 0, 0, 56, 68, 68, 68, 68, 56, 0, 0], "112": [0, 0, 0, 0, 60, 34, 34, 34, 34, 60, 32, 32], "113": [0, 0, 0, 0, 60, 68, 68, 68, 68, 60, 4, 4], "114": [0, 0, 0, 0, 56, 32, 32, 32, 32, 32, 0, 0], "115": [0, 0, 0, 0, 112, 72, 96, 24, 72, 120, 0, 0], "116": [0, 0, 32, 32, 112, 32, 32, 32, 32, 48, 0, 0], "117": [0, 0, 0, 0, 34, 34, 34, 34, 38, 30, 0, 0], "118": [0, 0, 0, 0, 68, 100, 40, 40, 56, 16, 0, 0], "119": [0, 0, 0, 0, 76, 77, 45, 53, 51, 50, 0, 0], "120": [0, 0, 0, 0, 72, 40, 48, 48, 40, 72, 0, 0], "121": [0, 0, 0, 0, 68, 100, 40, 40, 56, 16, 16, 32], "122": [0, 0, 0, 0, 60, 12, 8, 16, 48, 60, 0, 0], "123": [0, 48, 32, 32, 32, 32, 32, 32, 32, 32, 48, 0], "124": [0, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32], "125": [0, 96, 32, 32, 32, 32, 32, 32, 32, 32, 96, 0], "126": [0, 0, 0, 0, 0, 0, 50, 44, 0, 0, 0, 0], "127": [0, 0, 0, 124, 100, 68, 84, 100, 108, 124, 0, 0], "222": [0, 84, 84, 84, 84, 84, 56, 16, 16, 16, 0, 0], "235": [0, 0, 0, 108, 146, 146, 146, 108, 0, 0, 0, 0]};</script>
+<script type="module">
+import { Z80 } from "https://cdn.jsdelivr.net/npm/z80-emulator@2.3.0/dist/index.js";
+const CLOCK = 2027520, TICK = Math.floor(CLOCK / 30);
+const mem = new Uint8Array(65536);
+const keys = new Set();
+const KM = { ENTER:[0x40,0], CLEAR:[0x40,1], BREAK:[0x40,2], UP:[0x40,3], DOWN:[0x40,4], LEFT:[0x40,5], RIGHT:[0x40,6], SPACE:[0x40,7], SHIFT:[0x80,0] };
+'@ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach((c,i)=>KM[c]=[1<<(i>>3), i&7]);
+for (let i=0;i<10;i++) KM[String(i)] = [i<8?0x10:0x20, i&7];
+let rtc = 0, nextTick = TICK, soundOn = true;
+const audio = [];   // [tstate, level]
+const hal = {
+  tStateCount: 0,
+  readMemory(a) { if (a >= 0x3800 && a < 0x3C00) { let v=0; for (const k of keys) { const m=KM[k]; if (m && (a & m[0])) v |= 1<<m[1]; } return v; } return mem[a]; },
+  writeMemory(a, v) { if (a >= 0x4000 || (a >= 0x3C00)) mem[a] = v; },
+  contendMemory() {}, contendPort() {},
+  readPort(p) { p &= 0xFF; if (p === 0xE0) return rtc ? 0xFB : 0xFF; /* interrupt status is active low */ if (p === 0xEC) { rtc = 0; return 0xFF; } return 0xFF; },
+  writePort(p, v) { p &= 0xFF; if (p === 0xFF) audio.push([hal.tStateCount, v & 3]); }
+};
+let z80 = new Z80(hal);
+function loadCmd() {
+  const d = Uint8Array.from(atob(window.CMD), c => c.charCodeAt(0));
+  let i = 0, entry = 0;
+  while (i < d.length) {
+    const t = d[i], ln = d[i+1]; i += 2;
+    if (t === 1) { const n = ln > 2 ? ln : ln + 256; const a = d[i] | d[i+1] << 8; mem.set(d.subarray(i+2, i+n), a); i += n; }
+    else if (t === 2) { entry = d[i] | d[i+1] << 8; break; }
+    else i += ln;
+  }
+  return entry;
+}
+function reset() {
+  mem.fill(0); hal.tStateCount = 0; nextTick = TICK; rtc = 0; audio.length = 0;
+  z80 = new Z80(hal); z80.reset();
+  z80.regs.pc = loadCmd(); z80.regs.sp = 0xFFF0;
+}
+// ---------------------------------------------------------------- display
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const img = ctx.createImageData(512, 384), px = new Uint32Array(img.data.buffer);
+const ON = 0xFFFFE9DF, OFF = 0xFF0A0705;   // ABGR
+const shown = new Int16Array(1024).fill(-1);
+function drawCell(i, v) {
+  const cx = (i & 63) * 8, cy = (i >> 6) * 24;
+  for (let y = 0; y < 24; y++) {
+    let row = 0;
+    if (v >= 128 && v < 192) { const b = v - 128, blk = Math.floor(y / 8); row = ((b >> (blk*2)) & 1 ? 0xF0 : 0) | ((b >> (blk*2+1)) & 1 ? 0x0F : 0); }
+    else if ((v > 32 && v < 128 || v >= 192) && window.FONT[v]) { row = window.FONT[v][y >> 1] || 0; }
+    const o = (cy + y) * 512 + cx;
+    for (let x = 0; x < 8; x++) px[o + x] = (row & (0x80 >> x)) ? ON : OFF;
+  }
+}
+function render() {
+  let dirty = false;
+  for (let i = 0; i < 1024; i++) { const v = mem[0x3C00 + i]; if (shown[i] !== v) { shown[i] = v; drawCell(i, v); dirty = true; } }
+  if (dirty) ctx.putImageData(img, 0, 0);
+}
+// ---------------------------------------------------------------- sound
+let actx = null, audioT = 0, lastLevel = 0;
+function flushAudio(t0, t1) {
+  if (!actx || !soundOn) { audio.length = 0; return; }
+  const sr = actx.sampleRate, n = Math.max(1, Math.round((t1 - t0) / CLOCK * sr));
+  const buf = actx.createBuffer(1, n, sr), ch = buf.getChannelData(0);
+  let k = 0, lvl = lastLevel;
+  for (let s = 0; s < n; s++) {
+    const t = t0 + s / sr * CLOCK;
+    while (k < audio.length && audio[k][0] <= t) { lvl = audio[k][1] === 1 ? 0.18 : audio[k][1] === 2 ? -0.18 : 0; k++; }
+    ch[s] = lvl;
+  }
+  lastLevel = audio.length ? lvl : lastLevel * 0.5;
+  audio.length = 0;
+  const src = actx.createBufferSource(); src.buffer = buf; src.connect(actx.destination);
+  const now = actx.currentTime; if (audioT < now + 0.03) audioT = now + 0.05;
+  src.start(audioT); audioT += n / sr;
+}
+// ---------------------------------------------------------------- main loop: one RTC period per step
+let running = false, acc = 0, last = 0;
+const released = new Set();   // a key let go is held until the game has seen one more tick
+function stepTick() {
+  const t0 = hal.tStateCount;
+  while (hal.tStateCount < nextTick) z80.step();
+  rtc = 1; nextTick += TICK;
+  for (const k of released) keys.delete(k); released.clear();
+  flushAudio(t0, hal.tStateCount);
+}
+function loop(t) {
+  if (!running) return;
+  acc += Math.min(100, t - (last || t)); last = t;
+  let n = 0;
+  while (acc >= 1000 / 30 && n < 3) { stepTick(); acc -= 1000 / 30; n++; }
+  render();
+  requestAnimationFrame(loop);
+}
+// ---------------------------------------------------------------- input
+const KEYMAP = { ArrowUp:'UP', ArrowDown:'DOWN', ArrowLeft:'LEFT', ArrowRight:'RIGHT', ' ':'SPACE', Enter:'ENTER', Escape:'BREAK', Shift:'SHIFT' };
+function keyName(e) { if (KEYMAP[e.key]) return KEYMAP[e.key]; const k = e.key.toUpperCase(); return KM[k] ? k : null; }
+addEventListener('keydown', e => { const k = keyName(e); if (k && running) { keys.add(k); released.delete(k); e.preventDefault(); } });
+addEventListener('keyup', e => { const k = keyName(e); if (k) { released.add(k); e.preventDefault(); } });
+addEventListener('blur', () => keys.clear());
+document.querySelectorAll('.pad button').forEach(b => {
+  const k = b.dataset.k;
+  b.addEventListener('pointerdown', e => { keys.add(k); released.delete(k); b.setPointerCapture(e.pointerId); e.preventDefault(); });
+  const up = () => released.add(k);
+  b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up);
+});
+document.getElementById('go').addEventListener('click', () => {
+  try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; }
+  document.getElementById('ov').hidden = true; reset(); running = true; requestAnimationFrame(loop);
+});
+document.getElementById('reset').addEventListener('click', () => { reset(); shown.fill(-1); });
+document.getElementById('snd').addEventListener('click', e => { soundOn = !soundOn; e.target.textContent = 'Sound: ' + (soundOn ? 'on' : 'off'); });
+// a still first frame: run the title screen silently
+reset(); for (let i = 0; i < 12; i++) stepTick(); render(); audio.length = 0;
+document.getElementById('st').textContent = 'Emulated: Z80 at 2.03 MHz, 30 Hz clock interrupt, 64 x 16 video.';
+</script>
